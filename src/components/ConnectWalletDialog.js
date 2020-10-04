@@ -39,6 +39,14 @@ export default function ConnectWalletDialog(props) {
 
   // Initialize Trezor Connect
   const initializeTrezor = () => {
+    // Check for environment variables
+    if(!process.env.REACT_APP_DEVELOPER_EMAIL) {
+      throw new Error('Missing REACT_APP_DEVELOPER_EMAIL');
+    }
+    if(!process.env.REACT_APP_WEBSITE_URL) {
+      throw new Error('Missing REACT_APP_WEBSITE_URL');
+    }
+
     // Retrieve the settings
     TrezorConnect.getSettings()
     .then(response => {
@@ -49,6 +57,9 @@ export default function ConnectWalletDialog(props) {
         setIsTrezorInitialized(true);
       }
       else {
+        if(isTrezorInitialized) {
+          console.error('Trezor should have been initialized, are third party cookies allowed?');
+        }
         console.log(response.payload.error);
         switch(response.payload.code) {
           case 'Init_ManifestMissing':
