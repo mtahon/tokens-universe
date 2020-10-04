@@ -6,6 +6,7 @@ import Container from '@material-ui/core/Container';
 import MenuBar from './MenuBar';
 import Grid from '@material-ui/core/Grid';
 import Button from '@material-ui/core/Button';
+import ConnectWalletDialog from './ConnectWalletDialog';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -29,6 +30,19 @@ const useStyles = makeStyles((theme) => ({
 
 export default function MainContainer() {
   const classes = useStyles();
+
+  const [open, setOpen] = React.useState(false);
+  const [selectedValue, setSelectedValue] = React.useState();
+
+  const handleClickOpen = () => {
+    setOpen(true);
+  };
+
+  const handleClose = (value) => {
+    setOpen(false);
+    setSelectedValue(value);
+  };
+
   return (
     <React.Fragment>
       <CssBaseline />
@@ -40,9 +54,10 @@ export default function MainContainer() {
               <MenuBar/>
             </Grid>
             <Grid item xs={12} className={classes.centralItem}>
-              <Button variant="contained" color="secondary">
+              <Button variant="contained" color="secondary" onClick={handleClickOpen}>
                 Connect Wallet
               </Button>
+              <ConnectWalletDialog selectedValue={selectedValue} open={open} onClose={handleClose} />
             </Grid>            
           </Grid>
         </Typography>

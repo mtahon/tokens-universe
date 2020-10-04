@@ -22,6 +22,11 @@ Install the dependencies:
 yarn install
 ```
 
+Create a `.env` file, and edit it with your details:
+```shell
+cp .env.sample .env
+```
+
 Run the project:
 ```shell
 yarn start
