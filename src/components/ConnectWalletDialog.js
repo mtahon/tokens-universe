@@ -12,11 +12,20 @@ import AddIcon from '@material-ui/icons/Add';
 import { blue } from '@material-ui/core/colors';
 import TrezorConnect from 'trezor-connect';
 
-
 // Map types to labels
 const accountOriginLabel = {
   metamask: 'MetaMask',
   trezor: 'Trezor',
+};
+
+// Define states for the Trezor
+const TREZOR_STATES = {
+  UNDETERMINED             : 0, // Not sure yet what is the state
+  NOT_INITIALIZED          : 1, // Trezor is not initialized
+  INITIALIZATION_REQUESTED : 2, // Trezor initialization requested
+  INITIALIZED_IDLE         : 3, // Trezor initialized and waiting actions
+  INITIALIZATION_FAILED    : 4, // Trenzor intialization failed
+  ACCOUNTS_REQUESTED       : 5, // Trezor Accounts have been requested
 };
 
 const useStyles = makeStyles({
@@ -34,11 +43,10 @@ export default function ConnectWalletDialog(props) {
   const [accounts, setAccounts] = useState([]);
 
   // Maintain the Trezor states
-  const [isTrezorInitialized, setIsTrezorInitialized] = useState(false);
-  const [isTrezorConnecting, setIsTrezorConnecting] = useState(false);
+  const [trezorState, setTrezorState] = useState(TREZOR_STATES.UNDETERMINED);
 
   // Initialize Trezor Connect
-  const initializeTrezor = () => {
+  const updateTrezorState = () => {
     // Check for environment variables
     if(!process.env.REACT_APP_DEVELOPER_EMAIL) {
       throw new Error('Missing REACT_APP_DEVELOPER_EMAIL');
@@ -47,44 +55,70 @@ export default function ConnectWalletDialog(props) {
       throw new Error('Missing REACT_APP_WEBSITE_URL');
     }
 
-    // Retrieve the settings
+    // Retrieve the initialization settings
     TrezorConnect.getSettings()
     .then(response => {
       console.log("TrezorConnect.getSettings() =>", response);
 
-      // If success, Trezor Connect was already initialized
+      // If success, Trezor Connect is initialized
       if(response.success) {
-        setIsTrezorInitialized(true);
+        console.log('Trezor Connect Initialized')
+        setTrezorState(TREZOR_STATES.INITIALIZED_IDLE);
       }
       else {
-        if(isTrezorInitialized) {
-          console.error('Trezor should have been initialized, are third party cookies allowed?');
-        }
         console.log(response.payload.error);
-        switch(response.payload.code) {
-          case 'Init_ManifestMissing':
-          case 'Init_NotInitialized': {
-            TrezorConnect.init({
-              manifest: {
-                email: process.env.REACT_APP_DEVELOPER_EMAIL,
-                appUrl: process.env.REACT_APP_WEBSITE_URL,
-              },
-              lazyLoad: true,
-            })
-            .then(() => {
-              console.log('Trezor Connect Initialized')
-              setIsTrezorInitialized(true);
-            })
-            .catch(console.error);
+
+        // In case of error, the next action depends on the state
+        switch(trezorState) {
+          // Undetermined state
+          case TREZOR_STATES.UNDETERMINED:
+          case TREZOR_STATES.NOT_INITIALIZED: {
+            if(response.payload.code === 'Init_NotInitialized') {
+              // Initialize the Trezor
+              TrezorConnect.init({
+                manifest: {
+                  email: process.env.REACT_APP_DEVELOPER_EMAIL,
+                  appUrl: process.env.REACT_APP_WEBSITE_URL,
+                },
+                lazyLoad: true,
+              })
+              .then(() => {
+                console.log('Trezor Connect Initialization Requested')
+                updateTrezorState();
+              })
+              .catch(error => {
+                console.error(error);
+                setTrezorState(TREZOR_STATES.INITIALIZATION_FAILED);
+              });
+
+              // Update the state
+              setTrezorState(TREZOR_STATES.INITIALIZATION_REQUESTED);
+            } 
+            else {
+              console.warn('Trezor error not implemented')
+            }
+            break;
+          }
+
+          // If initialization was requested but fails, we are not able to initialize it
+          case TREZOR_STATES.INITIALIZATION_REQUESTED: {
+            setTrezorState(TREZOR_STATES.INITIALIZATION_FAILED);
+            console.error('Trezor should have been initialized, are third party cookies allowed?');
             break;
           }
 
           default:
-            console.warn('Error Code not implemented => ', response.payload.code);
-        }
+            console.error('Unexpected state => ', trezorState);
+            setTrezorState(TREZOR_STATES.INITIALIZATION_FAILED);
+
+        } // end switch
+        
       }
     })
-    .catch(console.error);
+    .catch(error => {
+      setTrezorState(TREZOR_STATES.INITIALIZATION_FAILED);
+      console.error(error);
+    });
   };
 
   // Merge accounts, ensuring there is not duplicated address
@@ -106,12 +140,12 @@ export default function ConnectWalletDialog(props) {
   // Update the Trezor State
   const retrieveTrezorAccounts = () => {
     // Prevent attempts before initialization
-    if(!isTrezorInitialized) {
-      throw new Error('Trezor not initialized');
+    if(trezorState !== TREZOR_STATES.INITIALIZED_IDLE) {
+      throw new Error('Trezor is not Idle');
     }
 
     // Retrieve the accounts from device
-    setIsTrezorConnecting(true);
+    setTrezorState(TREZOR_STATES.ACCOUNTS_REQUESTED);
     TrezorConnect.ethereumGetAddress({
       bundle: [
           { path: "m/44'/60'/0'/0/0", showOnTrezor: false }, // account 1
@@ -132,7 +166,7 @@ export default function ConnectWalletDialog(props) {
     })
     .catch(console.error)
     .finally(() => {
-      setIsTrezorConnecting(false);
+      setTrezorState(TREZOR_STATES.INITIALIZED_IDLE);
     });
   };
 
@@ -153,13 +187,37 @@ export default function ConnectWalletDialog(props) {
 
   // Initialize Trezor Connect when the component mounts
   useEffect(() => {
-    initializeTrezor();
-  },[isTrezorInitialized]);
+    if([
+      TREZOR_STATES.UNDETERMINED, 
+      TREZOR_STATES.NOT_INITIALIZED,
+    ].includes(trezorState)) {
+      updateTrezorState();
+    }
+  });
+
+  // Determine the current action label
+  const trezorCurrentActionLabel = () => {
+    switch(trezorState) {
+      case TREZOR_STATES.UNDETERMINED:
+      case TREZOR_STATES.NOT_INITIALIZED:
+      case TREZOR_STATES.INITIALIZATION_REQUESTED:
+        return 'Initializating Trezor';
+      case TREZOR_STATES.INITIALIZED_IDLE:
+        return 'Connect Trezor';
+      case TREZOR_STATES.ACCOUNTS_REQUESTED:
+        return 'Retrieving Accounts...';
+      case TREZOR_STATES.INITIALIZATION_FAILED:
+        return 'Trezor Unavailable';
+      default:
+        throw new Error('State not implemented');
+    }
+  };
 
   return (
     <Dialog onClose={handleClose} aria-labelledby="simple-dialog-title" open={open}>
       <DialogTitle id="simple-dialog-title">Select Wallet</DialogTitle>
       <List>
+        {/* List the accounts */}
         {accounts.map((account) => (
           <ListItem button onClick={() => handleAccountClick(account)} key={account.address}>
             <ListItemAvatar>
@@ -171,14 +229,17 @@ export default function ConnectWalletDialog(props) {
           </ListItem>
         ))}
 
-        <ListItem autoFocus button onClick={() => connectTrezor()} disabled={!isTrezorInitialized}>
+        {/* Trezor Connect */}
+        <ListItem autoFocus button onClick={() => connectTrezor()} disabled={trezorState !== TREZOR_STATES.INITIALIZED_IDLE}>
           <ListItemAvatar>
             <Avatar>
               <AddIcon />
             </Avatar>
           </ListItemAvatar>
-          <ListItemText primary={isTrezorConnecting ? "Connecting... " : "Connect Trezor"}/>
+          <ListItemText primary={trezorCurrentActionLabel()}/>
         </ListItem>
+
+
       </List>
     </Dialog>
   );
