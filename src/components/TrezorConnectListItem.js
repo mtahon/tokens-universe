@@ -36,11 +36,11 @@ export default function TrezorConnectListItem(props) {
     // Retrieve the initialization settings
     TrezorConnect.getSettings()
     .then(response => {
-      console.log("TrezorConnect.getSettings() =>", response);
+      //console.log("TrezorConnect.getSettings() =>", response);
 
       // If success, Trezor Connect is initialized
       if(response.success) {
-        console.log('Trezor Connect Initialized')
+        //console.log('Trezor Connect Initialized')
         setTrezorState(TREZOR_STATES.INITIALIZED_IDLE);
       }
       else {
@@ -61,7 +61,7 @@ export default function TrezorConnectListItem(props) {
                 lazyLoad: true,
               })
               .then(() => {
-                console.log('Trezor Connect Initialization Requested')
+                //console.log('Trezor Connect Initialization Requested')
                 updateTrezorState();
               })
               .catch(error => {
@@ -116,13 +116,13 @@ export default function TrezorConnectListItem(props) {
       ]
     })
     .then(response => {
-      console.log("TrezorConnect.ethereumGetAddress() => ", response)
+      //console.log("TrezorConnect.ethereumGetAddress() => ", response)
       if(response.success) {
         const trezorAccounts = response.payload.map(({address}) => ({
           address: address,
           origin: 'trezor',
         }));
-        console.log('trezorAccounts => ', trezorAccounts);
+        //console.log('trezorAccounts => ', trezorAccounts);
         onAccountsRetrieved(trezorAccounts);
       }
     })
@@ -153,7 +153,7 @@ export default function TrezorConnectListItem(props) {
       case TREZOR_STATES.UNDETERMINED:
       case TREZOR_STATES.NOT_INITIALIZED:
       case TREZOR_STATES.INITIALIZATION_REQUESTED:
-        return 'Initializating..';
+        return 'Initializing..';
       case TREZOR_STATES.INITIALIZED_IDLE:
         return 'Ready';
       case TREZOR_STATES.ACCOUNTS_REQUESTED:

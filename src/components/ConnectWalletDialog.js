@@ -35,18 +35,15 @@ export default function ConnectWalletDialog(props) {
 
   // Merge accounts, ensuring there is not duplicated address
   const mergeAccounts = (newAccounts) => {
-    let accountsUpdated = accounts;
-
-    // Check for each account if we can add it
-    newAccounts.forEach(newAccount => {
-      // If account address is not found, account is added
-      if(!accounts.find(account => account.address === newAccount.address)) {
-        accountsUpdated.push(newAccount);
-      }      
-    });
+    console.log(" Merging Accounts: ", newAccounts);
+    let accountsUpdated = [...accounts, ...newAccounts];
+    const indexedAccounts = accountsUpdated.reduce((acc, account) => {
+      acc[account.address] = account;
+      return acc;
+    }, {});
 
     // Update the state with the updated list
-    setAccounts(accountsUpdated);
+    setAccounts(Object.values(indexedAccounts));
   };
 
   // Handle closing the dialog
